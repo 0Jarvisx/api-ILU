@@ -1,0 +1,204 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "darwin-arm64", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique @db.VarChar(50)
+  description String?
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt   DateTime?        @map("deleted_at") @db.Timestamptz
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique @db.VarChar(100)
+  description String?
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt   DateTime?        @map("deleted_at") @db.Timestamptz
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  grantedAt    DateTime  @default(now()) @map("granted_at") @db.Timestamptz
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  roleId       Int       @map("role_id")
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  firstName    String?   @map("first_name") @db.VarChar(100)
+  lastName     String?   @map("last_name") @db.VarChar(100)
+  phone        String?   @db.VarChar(20)
+  dpi          String?   @db.VarChar(30)
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+
+  role         Role          @relation(fields: [roleId], references: [id])
+  reservations Reservation[]
+
+  @@map("users")
+}
+
+// ─── Habitaciones ─────────────────────────────────────────────────────────────
+
+model RoomType {
+  id                 Int       @id @default(autoincrement())
+  name               String    @unique @db.VarChar(20)
+  basePricePerNight  Decimal   @map("base_price_per_night") @db.Decimal(10, 2)
+  maxCapacity        Int       @map("max_capacity") @db.SmallInt
+  maxAdults          Int       @map("max_adults") @db.SmallInt
+  maxChildren        Int       @default(0) @map("max_children") @db.SmallInt
+  description        String?
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+
+  rooms     Room[]
+  amenities RoomTypeAmenity[]
+
+  @@map("room_types")
+}
+
+model Amenity {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique @db.VarChar(100)
+  icon      String?   @db.VarChar(50)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  roomTypes RoomTypeAmenity[]
+
+  @@map("amenities")
+}
+
+model RoomTypeAmenity {
+  roomTypeId Int @map("room_type_id")
+  amenityId  Int @map("amenity_id")
+
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  amenity  Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([roomTypeId, amenityId])
+  @@map("room_type_amenities")
+}
+
+model Room {
+  id         Int       @id @default(autoincrement())
+  roomNumber String    @unique @map("room_number") @db.VarChar(10)
+  roomTypeId Int       @map("room_type_id")
+  floor      Int       @db.SmallInt
+  isActive   Boolean   @default(true) @map("is_active")
+  notes      String?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+
+  roomType     RoomType      @relation(fields: [roomTypeId], references: [id])
+  images       RoomImage[]
+  reservations Reservation[]
+
+  @@map("rooms")
+}
+
+model RoomImage {
+  id        Int       @id @default(autoincrement())
+  roomId    Int       @map("room_id")
+  url       String    @db.VarChar(1000)
+  key       String    @db.VarChar(500)
+  isPrimary Boolean   @default(false) @map("is_primary")
+  sortOrder Int       @default(0) @map("sort_order") @db.SmallInt
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("room_images")
+}
+
+// ─── Huéspedes ────────────────────────────────────────────────────────────────
+
+model Guest {
+  id           Int           @id @default(autoincrement())
+  firstName    String        @map("first_name") @db.VarChar(100)
+  lastName     String        @map("last_name") @db.VarChar(100)
+  email        String        @unique @db.VarChar(255)
+  phone        String?       @db.VarChar(30)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  reservations Reservation[]
+
+  @@map("guests")
+}
+
+// ─── Reservaciones ────────────────────────────────────────────────────────────
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  CHECKED_IN
+  CHECKED_OUT
+}
+
+model Reservation {
+  id               Int               @id @default(autoincrement())
+  confirmationCode String            @unique @map("confirmation_code") @db.VarChar(20)
+  guestId          Int               @map("guest_id")
+  roomId           Int               @map("room_id")
+  userId           Int?              @map("user_id")
+  checkIn          DateTime          @map("check_in") @db.Date
+  checkOut         DateTime          @map("check_out") @db.Date
+  guestCount       Int               @map("guest_count") @db.SmallInt
+  totalPrice       Decimal           @map("total_price") @db.Decimal(10, 2)
+  status           ReservationStatus @default(PENDING)
+  notes            String?
+  version          Int               @default(0)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  guest         Guest                    @relation(fields: [guestId], references: [id])
+  room          Room                     @relation(fields: [roomId], references: [id])
+  bookedBy      User?                    @relation(fields: [userId], references: [id])
+  nightlyPrices ReservationNightlyPrice[]
+
+  @@map("reservations")
+}
+
+model ReservationNightlyPrice {
+  id            Int      @id @default(autoincrement())
+  reservationId Int      @map("reservation_id")
+  date          DateTime @db.Date
+  price         Decimal  @db.Decimal(10, 2)
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@map("reservation_nightly_prices")
+}
