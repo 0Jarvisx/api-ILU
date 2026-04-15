@@ -36,7 +36,7 @@ COPY --from=builder /app/dist ./dist
 
 # Entrypoint: migrations + seed + server
 COPY entrypoint.sh ./entrypoint.sh
-RUN chmod +x entrypoint.sh
+RUN sed -i 's/\r//' entrypoint.sh && chmod +x entrypoint.sh
 
 # Carpeta para uploads locales
 RUN mkdir -p uploads
